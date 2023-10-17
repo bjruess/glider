@@ -5,6 +5,7 @@ import useGlides from "../hooks/useGlides";
 import PaginatedGlides from "../components/glides/PaginatedGlides";
 import { Portal } from "solid-js/web";
 import Button from "../components/utils/Button";
+import { usePersistence } from "../context/persistence";
 
 const HomeScreen: Component = () => {
   const {

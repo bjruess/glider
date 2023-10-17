@@ -7,12 +7,34 @@ import PaginatedGlides from "../components/glides/PaginatedGlides";
 import MainLayout from "../components/layouts/Main";
 import { CenteredDataLoader } from "../components/utils/DataLoader";
 import Messenger from "../components/utils/Messenger";
+import { usePersistence } from "../context/persistence";
 import useSubglides from "../hooks/useSubGlides";
 import { Glide } from "../types/Glide";
 import { User } from "../types/User";
 
 const GlideDetail = () => {
   const params = useParams();
+  const persistence = usePersistence()!;
+
+  const onGlideLoaded = (glide: Glide) => {
+    resetPagination();
+    loadGlides(glide.lookup!);
+  }
+
+  const [data, {mutate, refetch}] = createResource(async () => {
+    
+    const glide = await persistence.useRevalidate(
+      `selectedGlide-${params.id}`, 
+      () => getGlideById(params.id, params.uid),
+      (latestGlide) => {
+        mutate(latestGlide)
+      }
+    )
+
+    onGlideLoaded(glide);
+    return glide;
+  });
+
   const {store, page, loadGlides, addGlide, resetPagination} = useSubglides();
   const user = () => data()?.user as User;
 
@@ -20,27 +42,17 @@ const GlideDetail = () => {
     if (!data.loading && data()?.id !== params.id) {
       refetch();
     }
-  });
-
-  const onGlideLoaded = (glide: Glide) => {
-    loadGlides(glide.lookup!);
-  }
-
-  const [data, {mutate, refetch}] = createResource(async () => {
-    const glide = await getGlideById(params.id, params.uid);
-    resetPagination();
-    onGlideLoaded(glide);
-    return glide;
-  });
- 
+  })
 
   const onGlideAdded = (newGlide?: Glide) => {
     const glide = data()!;
-
-    mutate({
+    const glideWithNewCount = {
       ...glide,
       subglidesCount: glide.subglidesCount + 1
-    });
+    }
+
+    mutate(glideWithNewCount);
+    persistence.setValue(`selectedGlide-${params.id}`, glideWithNewCount);
 
     addGlide(newGlide);
   }
@@ -48,16 +60,15 @@ const GlideDetail = () => {
   return (
     <MainLayout 
       onGlideAdded={onGlideAdded}
-      selectedGlide={data()} 
+      selectedGlide={data()}
       pageTitle={
-        <div onClick={() => history.back()}>
-          <div class="flex-it flex-row items-center text-xl cursor-pointer">
-            <FaSolidArrowLeft />
-            <div class="ml-5 font-bold">Back</div>
-          </div>
+      <div onClick={() => history.back()}>
+        <div class="flex-it flex-row items-center text-xl cursor-pointer">
+          <FaSolidArrowLeft />
+          <div class="ml-5 font-bold">Back</div>
         </div>
-      }
-    >
+      </div>
+    }>
       <Show 
         when={!data.loading}
         fallback={<CenteredDataLoader />}
@@ -80,7 +91,7 @@ const GlideDetail = () => {
           loadMoreGlides={() => {
             const lookup = data()?.lookup!;
             return loadGlides(lookup);
-          }} 
+          }}
         />
       </Show>
     </MainLayout>
